@@ -18,7 +18,7 @@ def create_rescore_ltr_query(user_query: str, query_obj, click_prior_query: str,
                 "sltr": {
                     "params": {
                         "keywords": user_query,
-                        "click_prior_query": click_prior_query
+                        "click_prior_query": click_prior_query,
                     },
                     "model": ltr_model_name,
                     "store": ltr_store_name
