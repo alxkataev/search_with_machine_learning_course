@@ -5,7 +5,7 @@ from tqdm import tqdm
 import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from collections import Counter
+from collections import defaultdict
 
 def transform_name(product_name):
     # IMPLEMENT
@@ -67,12 +67,12 @@ if __name__ == '__main__':
     with multiprocessing.Pool() as p:
         all_labels = tqdm(p.imap(_label_filename, files), total=len(files))
         
-    for label_list in all_labels:
-        for cat, name in label_list:
-            label_count[cat].append(name)
+        for label_list in all_labels:
+            for cat, name in label_list:
+                label_count[cat].append(name)
 
-    with open(output_file, 'w') as output:
-        for cat, names in label_count.items():
-            if len(names) >= min_products:
-                for name in names:
-                    output.write(f'__label__{cat} {name}\n')
+        with open(output_file, 'w') as output:
+            for cat, names in label_count.items():
+                if len(names) >= min_products:
+                    for name in names:
+                        output.write(f'__label__{cat} {name}\n')
