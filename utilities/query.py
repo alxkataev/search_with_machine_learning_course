@@ -12,10 +12,22 @@ import pandas as pd
 import fileinput
 import logging
 
+import fasttext
+import nltk
 
+stemmer = nltk.stem.PorterStemmer()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 logging.basicConfig(format='%(levelname)s:%(message)s')
+
+fasttext_model = fasttext.load_model("/workspace/search_with_machine_learning_course/query_classifier_400.bin")
+category_threshold = 0.0
+
+def normalize(query):
+    query = "".join([c if c.isalnum() else " " for c in query.lower()])
+    query = " ".join([stemmer.stem(w) for w in query.split()])
+    return query
+
 
 # expects clicks and impressions to be in the row
 def create_prior_queries_from_group(
@@ -49,7 +61,11 @@ def create_prior_queries(doc_ids, doc_id_weights,
 
 
 # Hardcoded query here.  Better to use search templates or other query config.
-def create_query(user_query, click_prior_query, filters, sort="_score", sortDir="desc", size=10, source=None):
+def create_query(user_query, click_prior_query, filters, sort="_score", sortDir="desc", size=10, source=None, categories=None):
+    
+    if categories:
+        filters.append({"terms": {"categoryPathIds.keyword": categories}})
+    
     query_obj = {
         'size': size,
         "sort": [
@@ -186,11 +202,27 @@ def create_query(user_query, click_prior_query, filters, sort="_score", sortDir=
     return query_obj
 
 
+def predict_categories(query):
+    query = normalize(query)
+    categories, probs = fasttext_model.predict(query, k=5)
+    _categories = []
+
+    for i in range(len(categories)):
+        if probs[i] > 0.0:
+            category = categories[i].replace("__label__", "")
+            _categories.append(category)
+        else:
+            break
+    return _categories
+
+
 def search(client, user_query, index="bbuy_products", sort="_score", sortDir="desc"):
     #### W3: classify the query
+    categories = predict_categories(user_query)
     #### W3: create filters and boosts
+
     # Note: you may also want to modify the `create_query` method above
-    query_obj = create_query(user_query, click_prior_query=None, filters=None, sort=sort, sortDir=sortDir, source=["name", "shortDescription"])
+    query_obj = create_query(user_query, click_prior_query=None, filters=None, sort=sort, sortDir=sortDir, source=["name", "shortDescription"], categories=categories)
     logging.info(query_obj)
     response = client.search(query_obj, index=index)
     if response and response['hits']['hits'] and len(response['hits']['hits']) > 0:

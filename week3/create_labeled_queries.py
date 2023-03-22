@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 import pandas as pd
 import numpy as np
 import csv
-
+from utilities.query import normalize
 # Useful if you want to perform stemming.
 import nltk
 stemmer = nltk.stem.PorterStemmer()
@@ -43,6 +43,7 @@ for child in root:
         categories.append(leaf_id)
         parents.append(cat_path_ids[-2])
 parents_df = pd.DataFrame(list(zip(categories, parents)), columns =['category', 'parent'])
+parent_to_cat = dict(zip(parents_df['category'].tolist(), parents_df['parent'].tolist()))
 
 # Read the training data into pandas, only keeping queries with non-root categories in our category tree.
 queries_df = pd.read_csv(queries_file_name)[['category', 'query']]
@@ -50,8 +51,21 @@ queries_df = queries_df[queries_df['category'].isin(categories)]
 
 # IMPLEMENT ME: Convert queries to lowercase, and optionally implement other normalization, like stemming.
 
-# IMPLEMENT ME: Roll up categories to ancestors to satisfy the minimum number of queries per category.
+def cat_replace(row):
+    if row['count'] < min_queries:
+        row['category'] = parents_map[row['category']]
+    return row
 
+queries_df['query'] = queries_df['query'].map(normalize)
+# IMPLEMENT ME: Roll up categories to ancestors to satisfy the minimum number of queries per category.
+queries_df['count'] = queries_df.groupby('category')['category'].transform('count')
+
+
+while len(queries_df[queries_df['count'] < min_queries]) > 0:
+    print('pruning')
+    queries_df = queries_df.apply(cat_replace, axis=1)
+    queries_df = queries_df[queries_df['category'].isin(categories)].reset_index(drop=True)
+    queries_df['count'] = queries_df.groupby('category')['category'].transform('count')
 # Create labels in fastText format.
 queries_df['label'] = '__label__' + queries_df['category']
 
